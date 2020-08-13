@@ -1,5 +1,6 @@
 #include "ukf.h"
 #include "Eigen/Dense"
+#include <iostream>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -75,9 +76,92 @@ UKF::~UKF() {}
 void UKF::ProcessMeasurement(MeasurementPackage meas_package)
 {
     /**
-     * TODO: Complete this function! Make sure you switch between lidar and radar
+     * Done: Complete this function! Make sure you switch between lidar and radar
      * measurements.
      */
+
+    /**
+     * If not initialized, initialize!
+     */
+    if (!is_initialized_)
+    {
+        if (meas_package.sensor_type_ == MeasurementPackage::LASER)
+        {
+            // clang-format off
+            P_ <<  std_laspx_ * 2,               0, 0, 0, 0,
+                                0,  std_laspy_ * 2, 0, 0, 0,
+                                0,               0, 1, 0, 0,
+                                0,               0, 0, 1, 0,
+                                0,               0, 0, 0, 1;
+
+            // set the state with the initial location and zero velocity
+            x_ <<   meas_package.raw_measurements_[0],
+                    meas_package.raw_measurements_[1],
+                    0,
+                    0;
+            // clang-format on
+
+            time_us_ = meas_package.timestamp_;
+        }
+        else if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
+        {
+            // clang-format off
+            P_ << std_radr_*2,              0,             0, 0, 0,
+                            0,  std_radphi_*2,             0, 0, 0,
+                            0,              0,  std_radrd_*2, 0, 0,
+                            0,              0,             0, 1, 0,
+                            0,              0,             0, 0, 1;
+            // clang-format on
+
+            // Convert radar from polar to cartesian coordinates and initialize state.
+            float rho = meas_package.raw_measurements_(0);
+            float phi = meas_package.raw_measurements_(1);
+            float rho_dot = meas_package.raw_measurements_(2);
+            float vx = rho_dot * cos(phi);
+            float vy = rho_dot * sin(phi);
+            float v = sqrt(vx * vx + vy * vy);
+
+            // clang-format off
+            x_ << rho * cos(phi),
+                  rho * sin(phi),
+                  v,
+                  0;
+            // clang-format on
+
+            time_us_ = meas_package.timestamp_;
+        }
+        else
+        {
+            std::cout << "Unknown sensor type, not able to initialize ukf" << std::endl;
+            return;
+        }
+
+        is_initialized_ = true;
+        return;
+    }
+
+    /**
+     * If initialized, predict and update!
+     */
+
+    // compute the time elapsed between the current and previous measurements
+    float dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+    time_us_ = meas_package.timestamp_;
+
+    Prediction(dt);
+
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER)
+    {
+        UpdateLidar(meas_package);
+    }
+    else if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
+    {
+        UpdateRadar(meas_package);
+    }
+    else
+    {
+        std::cout << "Unknown sensor type, not able to process ukf" << std::endl;
+    }
 }
 
 void UKF::Prediction(double delta_t)

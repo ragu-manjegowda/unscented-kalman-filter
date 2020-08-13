@@ -52,9 +52,22 @@ UKF::UKF()
      */
 
     /**
-     * TODO: Complete the initialization. See ukf.h for other member properties.
+     * Done: Complete the initialization. See ukf.h for other member properties.
      * Hint: one or more values initialized above might be wildly off...
      */
+    bool is_initialized_ = false;
+
+    n_x_ = 5;
+
+    n_aug_ = n_x_ + 2;
+
+    Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
+
+    time_us_ = 0;
+
+    weights_ = VectorXd((2 * n_aug_) + 1);
+
+    lambda_ = 3 - n_aug_;
 }
 
 UKF::~UKF() {}

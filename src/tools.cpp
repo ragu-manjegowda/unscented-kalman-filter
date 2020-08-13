@@ -52,8 +52,16 @@ rmarker Tools::radarSense(Car& car,
         sqrt((car.position.x - ego.position.x) * (car.position.x - ego.position.x) +
              (car.position.y - ego.position.y) * (car.position.y - ego.position.y));
     double phi = atan2(car.position.y - ego.position.y, car.position.x - ego.position.x);
-    double rho_dot = (car.velocity * cos(car.angle) * rho * cos(phi) +
-                      car.velocity * sin(car.angle) * rho * sin(phi)) /
+
+    /**
+     * Ragu : rho_dot should be relative to the ego vehicle
+     * Ref -
+     * https://github.com/xpcai2010/SFND_Unscented_Kalman_Filter/blob/master/src/tools.cpp
+     */
+    double rho_dot = ((car.velocity * cos(car.angle) - ego.velocity * cos(ego.angle)) *
+                          rho * cos(phi) +
+                      (car.velocity * sin(car.angle) - ego.velocity * sin(ego.angle)) *
+                          rho * sin(phi)) /
                      rho;
 
     rmarker marker =
@@ -79,6 +87,19 @@ rmarker Tools::radarSense(Car& car,
     MeasurementPackage meas_package;
     meas_package.sensor_type_ = MeasurementPackage::RADAR;
     meas_package.raw_measurements_ = VectorXd(3);
+
+    /**
+     * Ragu: convert from relative coordinates to absolute coordiates
+     * https://github.com/xpcai2010/SFND_Unscented_Kalman_Filter/blob/master/src/tools.cpp
+     */
+    double x = ego.position.x + marker.rho * cos(marker.phi);
+    double y = ego.position.y + marker.rho * sin(marker.phi);
+    double vx = ego.velocity * cos(ego.angle) + marker.rho_dot * cos(marker.phi);
+    double vy = ego.velocity * sin(ego.angle) + marker.rho_dot * sin(marker.phi);
+    marker.rho = sqrt(x * x + y * y);
+    marker.phi = atan2(y, x);
+    marker.rho_dot = (x * vx + y * vy) / marker.rho;
+
     meas_package.raw_measurements_ << marker.rho, marker.phi, marker.rho_dot;
     meas_package.timestamp_ = timestamp;
 

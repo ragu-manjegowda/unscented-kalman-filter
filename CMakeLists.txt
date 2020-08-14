@@ -7,7 +7,7 @@ set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
 project(playback)
 
-find_package(PCL 1.2 REQUIRED)
+find_package(PCL 1.8 REQUIRED)
 
 # Including custom cmake rules
 include(cmake/clang-cxx-dev-tools.cmake)

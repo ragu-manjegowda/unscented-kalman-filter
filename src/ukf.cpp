@@ -16,17 +16,27 @@ UKF::UKF()
     // if this is false, radar measurements will be ignored (except during init)
     use_radar_ = true;
 
+    n_x_ = 5;
+
+    n_aug_ = n_x_ + 2;
+
+    n_sig_ = 2 * n_aug_ + 1;
+
     // initial state vector
-    x_ = VectorXd(5);
+    x_ = VectorXd(n_x_);
 
     // initial covariance matrix
-    P_ = MatrixXd(5, 5);
+    P_ = MatrixXd(n_x_, n_x_);
 
     // Process noise standard deviation longitudinal acceleration in m/s^2
-    std_a_ = 30;
+    // Since we are on highway and as we take measurements less 1/10th of a second,
+    // we can choose longitudinal acceleration deviation of 2 m/s^2
+    std_a_ = 2;
 
     // Process noise standard deviation yaw acceleration in rad/s^2
-    std_yawdd_ = 30;
+    // Since we are on a highway we don't expect yawdd to be
+    // much larger so we are good with smaller value of PI/4 rad/s^2
+    std_yawdd_ = M_PI / 4;
 
     /**
      * DO NOT MODIFY measurement noise values below.
@@ -56,19 +66,35 @@ UKF::UKF()
      * Done: Complete the initialization. See ukf.h for other member properties.
      * Hint: one or more values initialized above might be wildly off...
      */
-    bool is_initialized_ = false;
 
-    n_x_ = 5;
+    is_initialized_ = false;
 
-    n_aug_ = n_x_ + 2;
-
-    Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
+    Xsig_pred_ = MatrixXd(n_x_, n_sig_);
 
     time_us_ = 0;
 
-    weights_ = VectorXd((2 * n_aug_) + 1);
-
     lambda_ = 3 - n_aug_;
+
+    weights_ = VectorXd(n_sig_);
+
+    // Set weights
+    weights_.fill(0.5 / (lambda_ + n_aug_));
+    weights_(0) = lambda_ / (lambda_ + n_aug_);
+
+    // Radar measurement degrees of freedom is 3 (r, phi, rd)
+    R_radar_ = MatrixXd(3, 3);
+
+    // Lidar measurement degrees of freedom is 2 (x, y)
+    R_lidar_ = MatrixXd(2, 2);
+
+    // clang-format off
+    R_radar_ << std_radr_ * std_radr_,                         0,                         0,
+                                    0, std_radphi_ * std_radphi_,                         0,
+                                    0,                         0,   std_radrd_ * std_radrd_;
+
+    R_lidar_ << std_laspx_ * std_laspx_,                       0,
+                                        0, std_laspy_ * std_laspy_;
+    // clang-format on
 }
 
 UKF::~UKF() {}

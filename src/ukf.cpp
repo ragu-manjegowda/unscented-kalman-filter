@@ -311,11 +311,79 @@ void UKF::Prediction(double delta_t)
 void UKF::UpdateLidar(MeasurementPackage meas_package)
 {
     /**
-     * TODO: Complete this function! Use lidar data to update the belief
+     * Done: Complete this function! Use lidar data to update the belief
      * about the object's position. Modify the state vector, x_, and
      * covariance, P_.
      * You can also calculate the lidar NIS, if desired.
      */
+
+    // set measurement dimension, radar can measure x and y
+    int n_z = 2;
+
+    // create matrix for sigma points in measurement space
+    MatrixXd Zsig = MatrixXd(n_z, n_sig_);
+
+    // mean predicted measurement
+    VectorXd z_pred = VectorXd(n_z);
+
+    // measurement covariance matrix S
+    MatrixXd S = MatrixXd(n_z, n_z);
+
+    // transform sigma points into measurement space
+    for (int i = 0; i < n_sig_; i++)
+    {
+        Zsig(0, i) = Xsig_pred_(0, i);
+        Zsig(1, i) = Xsig_pred_(1, i);
+    }
+
+    // calculate mean predicted measurement
+    z_pred.fill(0.0);
+    for (int i = 0; i < n_sig_; i++)
+    {
+        z_pred += weights_(i) * Zsig.col(i);
+    }
+
+    // calculate innovation covariance matrix S
+    S.fill(0);
+    for (int i = 0; i < n_sig_; ++i)
+    {
+        // residual
+        VectorXd z_diff = Zsig.col(i) - z_pred;
+
+        S = S + weights_(i) * z_diff * z_diff.transpose();
+    }
+
+    S += R_lidar_;
+
+    /**
+     * Update state and covariance
+     */
+
+    // create matrix for cross correlation Tc
+    MatrixXd Tc = MatrixXd(n_x_, n_z);  // 5 * 2
+
+    // calculate cross correlation matrix
+    Tc.fill(0.0);
+    for (int i = 0; i < n_sig_; i++)
+    {
+        VectorXd x_diff = Xsig_pred_.col(i) - x_;  // 5 * 1
+        VectorXd z_diff = Zsig.col(i) - z_pred;    // 2 * 1
+
+        Tc += weights_(i) * x_diff * z_diff.transpose();
+    }
+
+    // calculate Kalman gain K;
+    MatrixXd K = MatrixXd(n_x_, n_z);  // 5 * 2
+    K = Tc * S.inverse();
+
+    // create vector for incoming radar measurement
+    VectorXd z = meas_package.raw_measurements_;
+
+    VectorXd z_diff = z - z_pred;
+
+    // update state mean and covariance matrix
+    x_ = x_ + K * z_diff;             // (5 * 2) (2 * 1)
+    P_ = P_ - K * S * K.transpose();  // (5 * 2) (2 * 2) (2 * 5)
 }
 
 void UKF::UpdateRadar(MeasurementPackage meas_package)

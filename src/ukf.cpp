@@ -114,29 +114,28 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
         if (meas_package.sensor_type_ == MeasurementPackage::LASER)
         {
             // clang-format off
-            P_ <<  std_laspx_ * 2,               0, 0, 0, 0,
-                                0,  std_laspy_ * 2, 0, 0, 0,
-                                0,               0, 1, 0, 0,
-                                0,               0, 0, 1, 0,
-                                0,               0, 0, 0, 1;
+            P_ <<   std_laspx_ * std_laspx_,                        0, 0, 0, 0,
+                                          0,  std_laspy_ * std_laspy_, 0, 0, 0,
+                                          0,                        0, 1, 0, 0,
+                                          0,                        0, 0, 1, 0,
+                                          0,                        0, 0, 0, 1;
 
             // set the state with the initial location and zero velocity
             x_ <<   meas_package.raw_measurements_[0],
                     meas_package.raw_measurements_[1],
-                    0,
-                    0;
+                                                   0.,
+                                                   0.,
+                                                   0.;
             // clang-format on
-
-            time_us_ = meas_package.timestamp_;
         }
         else if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
         {
             // clang-format off
-            P_ << std_radr_*2,              0,             0, 0, 0,
-                            0,  std_radphi_*2,             0, 0, 0,
-                            0,              0,  std_radrd_*2, 0, 0,
-                            0,              0,             0, 1, 0,
-                            0,              0,             0, 0, 1;
+            P_ << std_radr_ * std_radr_,                          0,                        0, 0, 0,
+                                      0,  std_radphi_ * std_radphi_,                        0, 0, 0,
+                                      0,                          0,  std_radrd_ * std_radrd_, 0, 0,
+                                      0,                          0,                        0, 1, 0,
+                                      0,                          0,                        0, 0, 1;
             // clang-format on
 
             // Convert radar from polar to cartesian coordinates and initialize state.
@@ -150,11 +149,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
             // clang-format off
             x_ << rho * cos(phi),
                   rho * sin(phi),
-                  v,
-                  0;
+                               v,
+                              0.,
+                              0.;
             // clang-format on
-
-            time_us_ = meas_package.timestamp_;
         }
         else
         {
@@ -162,6 +160,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
             return;
         }
 
+        time_us_ = meas_package.timestamp_;
         is_initialized_ = true;
         return;
     }
@@ -171,16 +170,16 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package)
      */
 
     // compute the time elapsed between the current and previous measurements
-    float dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+    double dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
     time_us_ = meas_package.timestamp_;
 
     Prediction(dt);
 
-    if (meas_package.sensor_type_ == MeasurementPackage::LASER)
+    if (use_laser_ && meas_package.sensor_type_ == MeasurementPackage::LASER)
     {
         UpdateLidar(meas_package);
     }
-    else if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
+    else if (use_radar_ && meas_package.sensor_type_ == MeasurementPackage::RADAR)
     {
         UpdateRadar(meas_package);
     }

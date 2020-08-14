@@ -155,6 +155,13 @@ class Highway
         viewer->addText("Vy: " + std::to_string(rmse[3]), 30, 200, 20, 1, 1, 1,
                         "rmse_vy");
 
+        double timeElapsed = timestamp / 1000000.0;
+        viewer->addText("Time: " +
+                            std::to_string(timeElapsed)
+                                .substr(0, std::to_string(timeElapsed).find(".") + 3) +
+                            " s",
+                        30, 175, 20, 1, 1, 1, "timestamp");
+
         if (timestamp > 1.0e6)
         {
 

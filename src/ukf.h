@@ -104,6 +104,12 @@ class UKF
 
     // Num of sigma points
     int n_sig_;
+
+    // Normalized innovation square radar
+    double NIS_radar_;
+
+    // Normalized innovation square lidar
+    double NIS_lidar_;
 };
 
 #endif  // UKF_H

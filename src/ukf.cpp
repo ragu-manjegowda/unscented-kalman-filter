@@ -95,6 +95,9 @@ UKF::UKF()
     R_lidar_ << std_laspx_ * std_laspx_,                       0,
                                         0, std_laspy_ * std_laspy_;
     // clang-format on
+
+    NIS_radar_ = 0.;
+    NIS_lidar_ = 0.;
 }
 
 UKF::~UKF() {}
@@ -384,6 +387,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package)
     // update state mean and covariance matrix
     x_ = x_ + K * z_diff;             // (5 * 2) (2 * 1)
     P_ = P_ - K * S * K.transpose();  // (5 * 2) (2 * 2) (2 * 5)
+
+    // calculate NIS
+    NIS_lidar_ = z_diff.transpose() * S.inverse() * z_diff;
 }
 
 void UKF::UpdateRadar(MeasurementPackage meas_package)
@@ -515,4 +521,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
     // update state mean and covariance matrix
     x_ = x_ + K * z_diff;             // (5 * 3) (3 * 1)
     P_ = P_ - K * S * K.transpose();  // (5 * 3) (3 * 3) (3 * 5)
+
+    // calculate NIS
+    NIS_radar_ = z_diff.transpose() * S.inverse() * z_diff;
 }

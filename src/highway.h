@@ -4,6 +4,8 @@
 #include "render/render.h"
 #include "sensors/lidar.h"
 #include "tools.h"
+#include <fstream>
+#include <iostream>
 
 class Highway
 {
@@ -16,6 +18,12 @@ class Highway
     std::vector<double> rmseFailLog = {0.0, 0.0, 0.0, 0.0};
     Lidar* lidar;
 
+    bool logNIS_;
+    bool logGTCompare_;
+
+    std::unique_ptr<std::ofstream> nisFilePtr_;
+    std::unique_ptr<std::ofstream> measurementFilePtr_;
+
     // Parameters
     // --------------------------------
     // Set which cars to track with UKF
@@ -25,18 +33,20 @@ class Highway
     bool visualize_radar = true;
     bool visualize_pcd = false;
     // Predict path in the future using UKF
-    double projectedTime = 0;
-    int projectedSteps = 0;
+    double projectedTime = 1;
+    int projectedSteps = 2;
     // --------------------------------
 
-    Highway(pcl::visualization::PCLVisualizer::Ptr& viewer)
+    Highway(pcl::visualization::PCLVisualizer::Ptr& viewer,
+            bool logNIS,
+            bool logGTCompare)
     {
 
         tools = Tools();
 
         egoCar = Car(Vect3(0, 0, 0), Vect3(4, 2, 2), Color(0, 1, 0), 0, 0, 2, "egoCar");
 
-        Car car1(Vect3(-10, 4, 0), Vect3(4, 2, 2), Color(0, 0, 1), 5, 0, 2, "car1");
+        Car car1(Vect3(-10, 4, 0), Vect3(4, 2, 2), Color(1, 0, 0), 5, 0, 2, "car1");
 
         std::vector<accuation> car1_instructions;
         accuation a = accuation(0.5 * 1e6, 0.5, 0.0);
@@ -70,7 +80,7 @@ class Highway
         }
         traffic.push_back(car2);
 
-        Car car3(Vect3(-12, 0, 0), Vect3(4, 2, 2), Color(0, 0, 1), 1, 0, 2, "car3");
+        Car car3(Vect3(-12, 0, 0), Vect3(4, 2, 2), Color(1, 0, 1), 1, 0, 2, "car3");
         std::vector<accuation> car3_instructions;
         a = accuation(0.5 * 1e6, 2.0, 1.0);
         car3_instructions.push_back(a);
@@ -102,6 +112,47 @@ class Highway
         car1.render(viewer);
         car2.render(viewer);
         car3.render(viewer);
+
+        if (logNIS)
+        {
+            logNIS_ = true;
+            nisFilePtr_ =
+                std::unique_ptr<std::ofstream>(new std::ofstream("nisFile.csv"));
+
+            *(nisFilePtr_) << "Sensor Type, Time Stamp, Car Number, NIS Value\n";
+        }
+        else
+        {
+            logNIS_ = false;
+        }
+
+        if (logGTCompare)
+        {
+            logGTCompare_ = true;
+            measurementFilePtr_ =
+                std::unique_ptr<std::ofstream>(new std::ofstream("positionFile.csv"));
+
+            *(measurementFilePtr_)
+                << "Measurement Type, Time Stamp, Car Number, X Value, Y value, "
+                   "Velocity, Yaw\n";
+        }
+        else
+        {
+            logGTCompare_ = false;
+        }
+    }
+
+    ~Highway()
+    {
+        if (nisFilePtr_ != nullptr)
+        {
+            nisFilePtr_->close();
+        }
+
+        if (measurementFilePtr_ != nullptr)
+        {
+            measurementFilePtr_->close();
+        }
     }
 
     void stepHighway(double egoVelocity,
@@ -144,6 +195,38 @@ class Highway
                 double v2 = sin(yaw) * v;
                 estimate << traffic[i].ukf.x_[0], traffic[i].ukf.x_[1], v1, v2;
                 tools.estimations.push_back(estimate);
+
+                double time = traffic[i].ukf.time_us_ / 1000000.0;
+                std::string timeStampStr =
+                    std::to_string(time).substr(0, std::to_string(time).find(".") + 3);
+
+                std::string carNUM = std::to_string(i);
+
+                if (logNIS_)
+                {
+                    *(nisFilePtr_) << "Radar," + timeStampStr + "," + carNUM + "," +
+                                          std::to_string(traffic[i].ukf.NIS_radar_) +
+                                          "\n";
+                    *(nisFilePtr_) << "Lidar," + timeStampStr + "," + carNUM + "," +
+                                          std::to_string(traffic[i].ukf.NIS_lidar_) +
+                                          "\n";
+                }
+
+                if (logGTCompare_)
+                {
+                    *(measurementFilePtr_)
+                        << "Ground Truth," + timeStampStr + "," + carNUM + "," +
+                               std::to_string(traffic[i].position.x) + "," +
+                               std::to_string(traffic[i].position.y) + "," +
+                               std::to_string(traffic[i].velocity) + "," +
+                               std::to_string(traffic[i].angle) + "\n";
+                    *(measurementFilePtr_)
+                        << "UKF Estimation," + timeStampStr + "," + carNUM + "," +
+                               std::to_string(traffic[i].ukf.x_[0]) + "," +
+                               std::to_string(traffic[i].ukf.x_[1]) + "," +
+                               std::to_string(traffic[i].ukf.x_[2]) + "," +
+                               std::to_string(traffic[i].ukf.x_[3]) + "\n";
+                }
             }
         }
         viewer->addText("Accuracy - RMSE:", 30, 300, 20, 1, 1, 1, "rmse");

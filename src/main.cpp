@@ -17,7 +17,19 @@ int main(int argc, char** argv)
     float x_pos = 0;
     viewer->setCameraPosition(x_pos - 26, 0, 15.0, x_pos + 25, 0, 0, 0, 0, 1);
 
-    Highway highway(viewer);
+    /**
+     * Log NIS values to file
+     * format => Sensor Type, Time Stamp, Car Number, NIS Value
+     */
+    bool logNIS = false;
+
+    /**
+     * Log Ground Truth values and UKF estimations to file
+     * format => Measurement Type, Time Stamp, Car Number, X Value, Y value, Velocity, Yaw
+     */
+    bool logGTCompare = false;
+
+    Highway highway(viewer, logNIS, logGTCompare);
 
     int frame_per_sec = 30;
     int sec_interval = 10;
